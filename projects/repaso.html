@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repaso | Carlos Sanoja</title>
+  <meta name="description" content="A Telegram learning-support agent with persistent, inspectable learner memory on Strands Agents and Amazon Bedrock AgentCore Runtime, built for the AWS Good Neighbor Agents track.">
+  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="icon" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="../index.html"><img src="../favicon.svg" width="28" height="28" alt=""><span>Carlos Sanoja</span></a>
+  <nav aria-label="Site"><a href="../index.html#work">Work</a><a href="../about.html">About</a><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a></nav>
+  <button class="theme" type="button" aria-label="Switch between light and dark theme"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+</div></header>
+<main class="paper">
+  <a class="back" href="../index.html#work">All work</a>
+  <h1>Repaso: a learning agent whose memory a parent can inspect</h1>
+  <div class="meta"><span>August 2026 to September 2026</span><span>AWS hackathon, Good Neighbor Agents track</span></div>
+  <div class="links"><a class="btn primary" href="https://github.com/CarSanoja/repaso">Repository</a><a class="btn" href="https://builder.aws.com/content/3JL6ZEQTNgN6UIDQBfmjuHqjxoN/agents-for-humans-school-community-memory-with-repaso">Builder Center article</a></div>
+  <p class="abstract">A child who asks an agent for help should not have to start from zero each time, and the adult supporting them should be able to see what was tried. Repaso connects a family's Telegram conversation to a persistent learning record on Strands Agents and Amazon Bedrock AgentCore Runtime, and shows that record in a family dashboard. On 14 September 2026 a real Telegram exchange against the deployed runtime (version 13) retrieved a previously used explanation, produced a different one and saved it, without counting the help request as an answer. That is the extent of the live evidence: there was no family pilot, no teacher evaluation, no measured learning gain, and one day of real activity. Two upstream bug-fix pull requests to Strands came out of the work and are still open.</p>
+  <nav class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#problem">Problem</a></li><li><a href="#approach">Approach</a></li><li><a href="#architecture">Architecture</a></li><li><a href="#results">Results</a></li><li><a href="#negative">What did not work</a></li><li><a href="#lessons">Lessons</a></li></ol></nav>
+
+  <section id="problem"><h2><span class="n">1</span>Problem</h2>
+    <p>Chat tutors are usually stateless in the way that matters. A learner asks for another example of equivalent fractions, gets one, and next week gets the same cake explanation again because nothing recorded that it was already tried. The adult who sits between the learner and the school sees none of this: not which explanation was used, not what an answer actually demonstrated, not what happens next.</p>
+    <p>The proposed audience is a community learning facilitator supporting families between meetings, starting with fourth-grade mathematics. That audience is a proposal in the README, not something I tested with anyone. The design question was narrow: what is the smallest durable record that lets a model avoid repeating itself and lets an adult check the model's claims?</p>
+  </section>
+
+  <section id="approach"><h2><span class="n">2</span>Approach</h2>
+    <p>The agent keeps its own learning memory in DynamoDB instead of relying on a managed memory service; the README says plainly that the project does not provision the separate AgentCore Memory service. For each learner it stores the explanation approaches already used, evaluated answers, the content of the questions behind those answers, difficulty coverage, a mastery estimate, stored spaced-review dates and the decisions an adult recorded.</p>
+    <p>Deterministic code owns everything with consequences: family ownership of data, assessments, spacing, mastery updates, time limits and decisions with external effects. Models do the language work. A small model reads what the family's message is (an answer, a request for an explanation, something else) and returns a typed intent. Only a message read as an answer, while a practice capsule is open, can reach the grader. A larger model writes the explanation, and it is handed the approaches already used so that it can pick a different one. Asking for help is never graded as a wrong answer.</p>
+    <p>Strands supplies the typed structured-output boundary and four graphs: ingestion, practice, response (grade, apply, adapt, escalate) and quality. Durable operation records and leases stop tested duplicate events from applying a learning effect twice. Delivery is at least once, so Telegram can duplicate a message if it accepts a send and the acknowledgement is lost.</p>
+    <p>The dashboard is read-only and is the part meant for the adult. It descends from family to learner to topic to recorded day to a learning episode, which opens three synchronized columns: the conversation, the agent and its memory, and the learning evidence. A button re-reads saved memory from storage. Where the evidence is weak the interface says so; the live data showed "three answers, one distinct question" and the dashboard displays exactly that rather than a mastery claim.</p>
+  </section>
+
+  <section id="architecture"><h2><span class="n">3</span>Architecture</h2>
+    <figure>
+    <svg viewBox="0 0 760 190" role="img" aria-labelledby="fig1t" font-family="inherit" font-size="12">
+    <title id="fig1t">Telegram messages flow through a queue to AgentCore, which reads and writes durable memory; a read-only dashboard observes the same state</title>
+    <rect x="12" y="50" width="104" height="60" rx="6" fill="none" stroke="currentColor"/><text x="64" y="76" text-anchor="middle" fill="currentColor" font-weight="600">Telegram</text><text x="64" y="94" text-anchor="middle" fill="var(--muted)" font-size="11">family chat</text>
+    <path d="M116 80h30" stroke="currentColor" fill="none"/>
+    <rect x="146" y="50" width="130" height="60" rx="6" fill="none" stroke="currentColor"/><text x="211" y="76" text-anchor="middle" fill="currentColor" font-weight="600">API, queue, worker</text><text x="211" y="94" text-anchor="middle" fill="var(--muted)" font-size="11">EventBridge and SQS</text>
+    <path d="M276 80h30" stroke="currentColor" fill="none"/>
+    <rect x="306" y="50" width="150" height="60" rx="6" fill="none" stroke="var(--accent)"/><text x="381" y="76" text-anchor="middle" fill="currentColor" font-weight="600">AgentCore Runtime</text><text x="381" y="94" text-anchor="middle" fill="var(--muted)" font-size="11">Strands graphs, Bedrock</text>
+    <path d="M456 80h30" stroke="currentColor" fill="none"/>
+    <rect x="486" y="50" width="130" height="60" rx="6" fill="none" stroke="currentColor"/><text x="551" y="76" text-anchor="middle" fill="currentColor" font-weight="600">Learning memory</text><text x="551" y="94" text-anchor="middle" fill="var(--muted)" font-size="11">DynamoDB</text>
+    <path d="M616 80h30" stroke="var(--curve)" fill="none" stroke-dasharray="5 4"/>
+    <rect x="646" y="50" width="102" height="60" rx="6" fill="none" stroke="var(--curve)"/><text x="697" y="76" text-anchor="middle" fill="currentColor" font-weight="600">Dashboard</text><text x="697" y="94" text-anchor="middle" fill="var(--muted)" font-size="11">read-only</text>
+    <path d="M381 110v38h-317v-38" stroke="var(--muted)" fill="none" stroke-dasharray="3 3"/>
+    <text x="222" y="166" text-anchor="middle" fill="var(--muted)">recoverable outbox returns the reply</text>
+    </svg>
+    <figcaption>Request path as described in the README. The dashboard reads stored state and correlated CloudWatch events; it cannot send Telegram messages or enqueue work.</figcaption>
+    </figure>
+    <p>Scheduler events enter the same work pipeline as Telegram updates, so a scheduled practice capsule and a conversational turn share one path with the same ownership checks. Infrastructure is defined in CDK, and a separate hosted demo runs on Lambda with synthetic learners and scripted model replies. I have left its address out of this page because it is a rehearsal, not a deployment.</p>
+  </section>
+
+  <section id="results"><h2><span class="n">4</span>Results</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Measurement</th><th class="num">Result</th><th>Measured on</th></tr></thead>
+      <tbody>
+      <tr><td>Second help request: prior approach retrieved, different approach saved</td><td class="num">1 of 1 on version 13</td><td>Live Telegram and AWS, 14 Sep 2026, runtime version 13, one operator (me)</td></tr>
+      <tr><td>Approach labels saved</td><td class="num">2</td><td>Same exchange: "same-size piece cake model" (first request, no prior approach), then "paper strip folding"</td></tr>
+      <tr><td>Generation call time, first and second explanation</td><td class="num">3.88 s, 4.92 s</td><td>Same exchange, Sonnet call only, not total Telegram latency</td></tr>
+      <tr><td>Assessed answers after both help requests</td><td class="num">3 (unchanged)</td><td>Same exchange; help was not graded</td></tr>
+      <tr><td>Answer grader against my labels</td><td class="num">18 of 18 graded decisions agree</td><td>Development half, 30 synthetic cases, 5 distinct questions, 18 distinct answers; author labels only</td></tr>
+      <tr><td>False automatic-correct</td><td class="num">0 of 8, upper bound 32.4%</td><td>Same set, Wilson 95% interval, threshold 0.85</td></tr>
+      <tr><td>Message-reader, answer versus not an answer</td><td class="num">42/44 (Haiku 4.5)</td><td>22 message shapes, 2 samples each, live Bedrock, 13 Sep 2026</td></tr>
+      <tr><td>One synthetic student-day</td><td class="num">$0.1629</td><td>One run, 29 live calls, 12 Sep 2026; excludes infrastructure and human time</td></tr>
+      <tr><td>Full test suite at deployment of version 13</td><td class="num">2123 passed, 66 skipped</td><td>Local run, 86.09 s</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: the first four rows come from a single live session driven by the developer, not a family. The grader rows use labels I wrote myself; no teacher has labelled a case and the held-out half of the sixty answers was never opened. Cost is arithmetic on one measured journey, of which $0.1516 was building the question bank from two photographed pages and $0.0111 was the day's practice. Nothing was billed over a month.</p>
+    <p>Two further upstream results: pull request 4207 (read the model id through the public model configuration accessor so custom providers keep their id in traces) and pull request 4208 (declare the model-state and cache-boundary arguments on the streaming interface that the event loop already passes). Both carry regression tests, both were opened on 6 September, and both were still open and unmerged when I checked on 19 October 2026. I found the problems while wrapping models for deterministic record and replay.</p>
+  </section>
+
+  <section id="negative"><h2><span class="n">5</span>What did not work</h2>
+    <h3>The first live attempts proved little</h3>
+    <p>The first request at 21:58 UTC reached the runtime, was classified and delivered, but there was no open practice, so the bot replied that the capsule would arrive later and nothing was saved. When I then opened a study session and answered its three questions, all three questions were identical: three different identifiers with the same text and options. The 3 of 3 correct result was real and meant nothing about mastery. The bank selection had to be changed to drop identical content, and the interface now reports distinct questions next to answers.</p>
+    <h3>The safety filter blocked my own prompt</h3>
+    <p>On version 12, a help request ended in a guardrail intervention (prompt attack, medium confidence) before any explanation was produced. The old template put application instructions inside the user message. Moving instructions to the system message and passing lesson data as a record fixed it, and a probe containing "ignore instructions" in the data was still blocked. The failed request remained visible and no longer counted as an explanation remembered. Even after the fix, one generated explanation gave away the equivalence early, so I do not claim the answer stays hidden.</p>
+    <h3>The cheapest reader invented answers</h3>
+    <p>Nova Micro read the answer-versus-not split correctly 39 times in 44, but in 4 of 44 calls it filled the answer field with "6/8", an option the family never wrote, twice on a lone thumbs-up. One of those would have been graded correct. I routed the reader to a structured-output role instead (Haiku 4.5 deployed; 42 of 44 on the split, and neither Haiku nor Nova Lite invented an answer).</p>
+    <h3>An answerability check that removed good items</h3>
+    <p>A forced-choice probe that could veto generated questions rejected all 36 planted-defect decisions but also kept only 7 of 54 unplanted decisions (13.0%), against 20 of 54 (37.0%) with the critic alone. Both labels there come from construction, since no teacher reviewed the items. The probe now only records its signal and cannot discard anything.</p>
+    <h3>The grader decided ambiguous answers alone</h3>
+    <p>At the 0.85 threshold, four ambiguous answers ("Creo que sí porque las dos se parecen", one text against four questions) were decided automatically at exactly 0.85 confidence, where my label said a person should look. I froze the threshold anyway: the sweep showed no measurable gain from moving it, and I recorded that 0.85 sits on a mass point. That is a known weakness, not a resolution.</p>
+  </section>
+
+  <section id="lessons"><h2><span class="n">6</span>Lessons</h2>
+    <ul>
+      <li>Show the denominator in the product. "Three answers, one distinct question" is a better dashboard line than a mastery bar the data cannot support.</li>
+      <li>Keep help requests out of the grading path by construction: only a message read as an answer, with a capsule open, can reach the grader.</li>
+      <li>Separate instructions from data in prompts when a managed guardrail is in the path, or it will read your own template as an attack.</li>
+      <li>Route each role by measuring it. The model the reader inherited from the classify role invented an answer in 4 of 44 calls.</li>
+      <li>Write the boundary down early. This was one operator, one day and no outcome measurement, and the README says so.</li>
+    </ul>
+  </section>
+  <nav class="pager" aria-label="More work"><a href="gradesync.html">GradeSync</a><a href="biohub-cell-tracking.html">Biohub cell tracking</a></nav>
+</main>
+<footer><div class="wrap"><span>Carlos Sanoja</span><span class="foot-links"><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a><a href="https://orcid.org/0009-0000-0339-7072">ORCID</a></span></div></footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

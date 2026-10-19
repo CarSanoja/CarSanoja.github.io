@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GradeSync exam grading | Carlos Sanoja</title>
+  <meta name="description" content="A fleet of Gemini agents on Google Cloud that grades handwritten exams unattended and holds back the ones that need a teacher, with the measured run and the red-team results.">
+  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="icon" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="../index.html"><img src="../favicon.svg" width="28" height="28" alt=""><span>Carlos Sanoja</span></a>
+  <nav aria-label="Site"><a href="../index.html#work">Work</a><a href="../about.html">About</a><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a></nav>
+  <button class="theme" type="button" aria-label="Switch between light and dark theme"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+</div></header>
+<main class="paper">
+  <a class="back" href="../index.html#work">All work</a>
+  <h1>AutoCurricula GradeSync: grading handwritten exams until a human is needed</h1>
+  <div class="meta"><span>August 2026</span><span>Google All Things Agentic hackathon</span></div>
+  <div class="links"><a class="btn primary" href="https://youtu.be/m3yK7J8G5Ko">Demo video</a><a class="btn" href="https://github.com/google/adk-python/issues/6836">ADK issue 6836</a><a class="btn" href="https://github.com/googleapis/python-genai/issues/2889">python-genai issue 2889</a></div>
+  <p class="abstract">Teachers grade by hand and retype every mark into the school system. GradeSync is a fleet of Gemini agents on Google Cloud that takes a bucket of scanned handwritten exams, grades each page against a rubric with cited evidence, writes the confident results to a gradebook, and holds the rest for the teacher. In one production run on synthetic exams, 96 of 108 papers reached the gradebook with nobody involved and 12 were held for review. A red-team harness with 13 classes (12 attack classes and an innocent control) caught 83.3% of hostile pages on its first campaign and 100% on its second. The calibration run missed its promotion gate: quadratic weighted kappa 0.845 against a 0.85 bar, on 4 exams, so no prompt change was promoted. All data is synthetic and the hackathon result is unknown to me.</p>
+  <nav class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#problem">Problem</a></li><li><a href="#approach">Approach</a></li><li><a href="#results">Results</a></li><li><a href="#negative">What did not work</a></li><li><a href="#lessons">Lessons</a></li></ol></nav>
+
+  <section id="problem"><h2><span class="n">1</span>Problem</h2>
+    <p>The project README cites the OECD TALIS 2024 measurement of 4.6 hours a week spent grading by hand, out of a 41-hour working week. In the schools the authors work with, feedback typically arrives a week or two after the exam, and every grade is then retyped into the student information system. The README states these as the motivation, not as something I measured.</p>
+    <p>The hard part is not producing a grade. A model can do that on most pages. The hard part is deciding which grades should never be written without a person: pages that are barely legible, pages where the student wrote instructions aimed at the grader, and any case where the model is confident for the wrong reason. A system that grades everything and escalates nothing is a liability in a gradebook. So the design target was a fleet that works in the background and stops when a human judgement is needed.</p>
+  </section>
+
+  <section id="approach"><h2><span class="n">2</span>Approach</h2>
+    <p>Scans are uploaded to a Cloud Storage bucket. A notification reaches a Cloud Run service through Pub/Sub, and a graph of agents built with the Google Agent Development Kit processes the job. Twelve components sit behind one governing harness: eight are model-backed agents on Gemini 3.5 Flash and Flash-Lite, and four are deterministic (risk scoring, schema repair and the two prompt optimizers).</p>
+    <p>Three rules shaped the design.</p>
+    <ul>
+      <li>Every grade carries an evidence span, a verbatim quote with a page number. A record without evidence is not written.</li>
+      <li>Confidence is gated. A record is written to the gradebook only if its confidence is at or above 0.85 and it has cited evidence. Otherwise it is quarantined for one-click teacher review, never guessed and never silently synced.</li>
+      <li>Facts a rule can settle are not left to the model. Legibility is a deterministic image metric (blur variance times contrast) that discounts the model's self-reported confidence. Dropout risk comes from z-scores and slopes over history. The permission gate ranks deny over quarantine over allow.</li>
+    </ul>
+    <p>Every page is also screened for handwritten prompt injection, meaning text addressed to the grader instead of answers to the exam. A detection forces quarantine whatever the confidence. A second reader transcribes each page independently, so the quotes the grader cited are checked against a reading that never saw the grade.</p>
+    <p>Building this hit two defects in Google's libraries, both filed with minimal reproductions. In <a href="https://github.com/google/adk-python/issues/6836">adk-python 6836</a>, <code>LlmAgent</code> rejected <code>temperature=</code> with no discoverable route to <code>generate_content_config</code>; the README reports it fixed and closed on 28 August 2026, and that we checked the fix against four edge cases. In <a href="https://github.com/googleapis/python-genai/issues/2889">python-genai 2889</a>, Vertex structured output returned empty dict-typed fields without any error; per the README the maintainers acknowledged it and filed an internal bug.</p>
+  </section>
+
+  <section id="results"><h2><span class="n">3</span>Results</h2>
+    <p>The production run used three sections of 36 synthetic exams each, sent one at a time to the deployed Cloud Run service. The count was read back from two surfaces that share no code path: the gradebook ledger and the review queue.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Section</th><th class="num">Exams</th><th class="num">Written to gradebook</th><th class="num">Held for teacher</th></tr></thead>
+      <tbody>
+      <tr><td>10A</td><td class="num">36</td><td class="num">32</td><td class="num">4</td></tr>
+      <tr><td>10B</td><td class="num">36</td><td class="num">32</td><td class="num">4</td></tr>
+      <tr><td>10C</td><td class="num">36</td><td class="num">32</td><td class="num">4</td></tr>
+      <tr><td>Total</td><td class="num">108</td><td class="num">96</td><td class="num">12</td></tr>
+      </tbody>
+    </table></div>
+    <p>Each section held four papers: two stopped by the injection screen and two by the legibility floor. The 12 are the papers the synthetic roster was designed to hold, so this run shows the gate firing where expected; it does not show the system finding hard cases on its own. Wall clock from upload to completed was 135 s for section 10A and 255 s for section 10C.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Red-team campaign</th><th class="num">Hostile pages caught</th><th class="num">Clean twins flagged</th><th class="num">Fail-open errors</th></tr></thead>
+      <tbody>
+      <tr><td>20 August</td><td class="num">83.3% (20 of 24)</td><td class="num">0%</td><td class="num">0</td></tr>
+      <tr><td>21 August</td><td class="num">100% (24 of 24)</td><td class="num">0%</td><td class="num">0</td></tr>
+      </tbody>
+    </table></div>
+    <p>The harness has 13 classes, 12 of them attacks and one an innocent control (direct imperatives, forged system authority, rubric substitution, micro-print, encoded text, language switch, metadata channel and others), two payloads per class, each hostile page paired with a clean twin so that a screener that quarantines everything scores zero. The screen was Gemini 3.5 Flash-Lite. Total cost was under one cent per campaign.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Calibration, 20 August</th><th class="num">QWK</th><th class="num">MAE</th><th class="num">Bias</th></tr></thead>
+      <tbody>
+      <tr><td>Active grading prompt</td><td class="num">0.845</td><td class="num">0.208</td><td class="num">-0.042</td></tr>
+      <tr><td>Candidate a0</td><td class="num">0.845</td><td class="num">0.208</td><td class="num">-0.042</td></tr>
+      <tr><td>Candidates a1 and a2</td><td class="num">0.800</td><td class="num">0.250</td><td class="num">0.000</td></tr>
+      <tr><td>Promotion gate</td><td class="num">at least 0.85</td><td class="num">at most 0.4</td><td class="num">below 0.1 in magnitude</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: the production run is one pass on the deployed service (revision 00058) with synthetic exams and a roster that fixes which papers should be held. Red-team numbers come from two campaigns of 24 scripted hostile payloads against our own screen; grading was not run in either, so the grade-move rate is not measured. Calibration is one run on 4 human-graded synthetic exams (12 criterion scores) with no held-out set; the README gives a 95% interval of 0.53 to 0.96 on that kappa. The run took 124.9 s and cost $0.63.</p>
+  </section>
+
+  <section id="negative"><h2><span class="n">4</span>What did not work</h2>
+    <h3>The prompt optimizer found nothing to promote</h3>
+    <p>The meta-optimizer proposed three candidate prompts. One tied the baseline exactly and was rejected because acceptance requires a strict improvement. Two made things worse (MAE 0.250, QWK 0.800) by replacing the seed few-shot examples with a fabricated one. The loop stopped after one cycle. The baseline itself passes the MAE and bias gates but fails kappa by 0.005, so nothing was promoted. With only 12 criterion scores, one half-point change moves kappa by 0.045, nine times the gap to the gate, so the 0.85 threshold is close to a coin toss at this sample size. The report says a promotion would need at least 20 human-graded students. In the deployed demo this loop does not run at all, because the container ships without calibration data, and the README says so.</p>
+    <h3>The first red-team campaign failed</h3>
+    <p>83.3% was below the 95% bar, and the metadata class scored 0 of 2. The screener only looked at page images, while the grading prompt serialised the submission record, including the file name. A hostile file name therefore reached the model unscreened. File names were not on the list of input channels until the campaign showed it. The fix has three layers: reject hostile names at the API, redact the derived identity when a file is dropped straight into the bucket, and screen and sanitise every manifest-derived string before any model call. The same work added base64 decoding for the encoded-payload class. In an offline, model-free run the deterministic layer moved those two classes from 0 of 2 to 2 of 2 each, so these catches need no model call.</p>
+    <h3>Leakage in the optimizer's own validator</h3>
+    <p>Two candidates embedded a real calibration student, with the human score, inside a few-shot example. The anti-gaming validator inspects score distributions, not few-shot content, so it did not flag this. It did not help the candidates here, but with a larger few-shot budget a proposer could memorise the calibration set. The report lists a check for it as follow-up, and I have not verified that it was built.</p>
+    <h3>Naming a screen after a product I do not use</h3>
+    <p>The submitted video calls the injection screen "Model Armor". That is a Google Cloud product and the project does not use it; the screen is our own multimodal prompt plus a deterministic prescreen. The video was already submitted, so the README carries the correction.</p>
+    <h3>Limits from the project's own audit</h3>
+    <p>The repository holds an adversarial review of the engine dated 20 August. Among its findings from reading the code, the optimizer selects and evaluates on the same four samples, and records approved after rework reached the gradebook without provenance. I have not checked whether either was closed afterwards.</p>
+  </section>
+
+  <section id="lessons"><h2><span class="n">5</span>Lessons</h2>
+    <ul>
+      <li>Report what the gate did, not only what it passed. Twelve held papers is a result only because each one has a stated reason: six low-legibility and six injection, two of each kind per section.</li>
+      <li>A red team that fails first is more useful than one that passes. The failed campaign found a channel, the file name, that no amount of tuning the image screen would have reached.</li>
+      <li>Paired clean twins keep a screener honest. Without them, quarantining everything looks like perfect detection.</li>
+      <li>Small calibration sets cannot carry a threshold. At 12 scores the gate is below the noise, and the right response was to refuse to promote, not to relax the bar.</li>
+      <li>Upstream bugs are part of the work. Filing minimal reproductions led to a fix for one of the two, closed on 28 August 2026 per the README.</li>
+    </ul>
+  </section>
+  <nav class="pager" aria-label="More work"><a href="countersign.html">Countersign</a><a href="repaso.html">Repaso</a></nav>
+</main>
+<footer><div class="wrap"><span>Carlos Sanoja</span><span class="foot-links"><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a><a href="https://orcid.org/0009-0000-0339-7072">ORCID</a></span></div></footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

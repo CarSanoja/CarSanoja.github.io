@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COUNTERSIGN | Carlos Sanoja</title>
+  <meta name="description" content="An agent fleet that prepares vendor onboarding and invoice verification files and holds no capability to sign or pay, built for the DevNetwork API + Cloud + AI Hackathon 2026.">
+  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="icon" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="../index.html"><img src="../favicon.svg" width="28" height="28" alt=""><span>Carlos Sanoja</span></a>
+  <nav aria-label="Site"><a href="../index.html#work">Work</a><a href="../about.html">About</a><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a></nav>
+  <button class="theme" type="button" aria-label="Switch between light and dark theme"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+</div></header>
+<main class="paper">
+  <a class="back" href="../index.html#work">All work</a>
+  <h1>COUNTERSIGN: an agent fleet that cannot sign or pay</h1>
+  <div class="meta"><span>September 2026</span><span>DevNetwork API + Cloud + AI Hackathon 2026</span></div>
+  <div class="links"><a class="btn primary" href="https://github.com/CarSanoja/countersign">Repository</a><a class="btn" href="https://api-cloud-ai-hackathon-2026.devpost.com/">Hackathon page</a></div>
+  <p class="abstract">Business email compromise often starts with an invoice from a lookalike domain claiming the vendor's bank account changed, and the usual control is a person looking at a PDF. COUNTERSIGN is a seven-stage agent pipeline that does the whole verification file in about forty seconds and then stops: signing and payment are capabilities that no agent in the fleet holds, and the gate fails closed on anything undeclared. On six labelled invoices it returned the right verdict 6/6 and was refused a signature 12/12 times. On a 20-invoice soak corpus (16 legitimate, 4 fraudulent) it detected 8/8 fraudulent runs but still flagged 9/32 legitimate runs, a 28.1% false-positive rate that I report as too high to deploy. I built it on 1 and 2 September 2026, and I do not know how it was judged.</p>
+  <nav class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#problem">Problem</a></li><li><a href="#approach">Approach</a></li><li><a href="#architecture">Architecture</a></li><li><a href="#results">Results</a></li><li><a href="#negative">What did not work</a></li><li><a href="#lessons">Lessons</a></li></ol></nav>
+
+  <section id="problem"><h2><span class="n">1</span>Problem</h2>
+    <p>An invoice arrives from a domain one character away from the real vendor's and says the bank account has changed. The control that should stop it is a person in accounts payable reading a PDF for about four minutes. The project README cites the FBI IC3 2025 report for $3,046,598,558 in reported losses across 24,768 complaints, with a $123,005 median, and Ardent Partners (2025) for $12.88 to $19.83 per manually processed invoice.</p>
+    <p>The failure is not carelessness. The check is not reproducible: nobody has time to find the vendor's real domain, the bank-detail change gets confirmed over the channel the attacker already controls, and afterwards nothing records what was checked. I wanted a system that does the checking work consistently and leaves a trace, without being a system that can be talked into moving money.</p>
+  </section>
+
+  <section id="approach"><h2><span class="n">2</span>Approach</h2>
+    <p>The pipeline has seven stages. Ingest parses the invoice deterministically with Nutrient DWS; the model only maps spans that already exist onto named fields, each field keeps the page and box it came from as fractions of the page, and a value it cannot anchor comes back absent rather than invented. Identity uses SerpApi to ask whether the counterparty is the same legal entity or a namesake, whether coverage is adverse, and whether the address is a business or a mail drop. Domain uses name.com to check 40 confusable variants across eight attack classes against the live registry. Risk fuses the evidence into a verdict where every claim must cite an evidence span; a verdict that cites nothing is rejected and retried. Generate produces an out-of-band bank verification document with Foxit PDF Services, Deliver prepares a Foxit eSign envelope in draft and stops, and Persist writes the vendor record and an append-only audit log to Xano.</p>
+    <p>The central claim is checkable in code. In <code>fleet/capabilities.py</code>, <code>signature.execute</code> and <code>payment.release</code> are declared as human-only capabilities and are absent from the set the agents hold. They are declared on purpose, so that an attempt resolves to a named capability and is denied on the record instead of being inexpressible and therefore unauditable. A tool that is not in the mapping resolves to no capability and is denied, so the gate fails closed. <code>tests/test_boundary.py</code> fails if anyone grants an agent the power to sign, and <code>tests/test_adversarial.py</code> tries to break the boundary.</p>
+    <p>Four of the seven agents call Gemini 3.5 Flash or Flash-Lite on Vertex AI. Three deliberately do not: the domain sentinel is deterministic so its signal survives an audit, the envelope preparer is plumbing, and the injection screener stays outside a model because asking a model whether a document is manipulating a model puts the judgement inside the blast radius. IBANs, BICs, tax identifiers and mailboxes are masked before any prompt is built, so no account identifier enters a model context. The capability ledger, permission gate, injection armor, review queue and evidence-span verification come from my earlier quanta-gradesync project; the README states this is a new domain on that base, not a fork.</p>
+  </section>
+
+  <section id="architecture"><h2><span class="n">3</span>Architecture</h2>
+    <figure>
+    <svg viewBox="0 0 760 270" role="img" aria-labelledby="fig1t" font-family="inherit" font-size="12">
+    <title id="fig1t">Seven agent stages inside a capability boundary; signing and payment sit outside it</title>
+    <rect x="8" y="8" width="744" height="140" rx="8" fill="none" stroke="var(--rule)" stroke-dasharray="6 4"/>
+    <text x="20" y="28" fill="var(--muted)">Agent boundary: nine capabilities held</text>
+    <rect x="20" y="52" width="94" height="64" rx="6" fill="none" stroke="currentColor"/><text x="67" y="80" text-anchor="middle" fill="currentColor" font-weight="600">Ingest</text><text x="67" y="100" text-anchor="middle" fill="var(--muted)" font-size="11">Nutrient</text>
+    <path d="M114 84h10" stroke="currentColor" fill="none"/>
+    <rect x="124" y="52" width="94" height="64" rx="6" fill="none" stroke="currentColor"/><text x="171" y="80" text-anchor="middle" fill="currentColor" font-weight="600">Identity</text><text x="171" y="100" text-anchor="middle" fill="var(--muted)" font-size="11">SerpApi</text>
+    <path d="M218 84h10" stroke="currentColor" fill="none"/>
+    <rect x="228" y="52" width="94" height="64" rx="6" fill="none" stroke="currentColor"/><text x="275" y="80" text-anchor="middle" fill="currentColor" font-weight="600">Domain</text><text x="275" y="100" text-anchor="middle" fill="var(--muted)" font-size="11">name.com</text>
+    <path d="M322 84h10" stroke="currentColor" fill="none"/>
+    <rect x="332" y="52" width="94" height="64" rx="6" fill="none" stroke="currentColor"/><text x="379" y="80" text-anchor="middle" fill="currentColor" font-weight="600">Risk</text><text x="379" y="100" text-anchor="middle" fill="var(--muted)" font-size="11">Gemini + rules</text>
+    <path d="M426 84h10" stroke="currentColor" fill="none"/>
+    <rect x="436" y="52" width="94" height="64" rx="6" fill="none" stroke="currentColor"/><text x="483" y="80" text-anchor="middle" fill="currentColor" font-weight="600">Generate</text><text x="483" y="100" text-anchor="middle" fill="var(--muted)" font-size="11">Foxit PDF</text>
+    <path d="M530 84h10" stroke="currentColor" fill="none"/>
+    <rect x="540" y="52" width="94" height="64" rx="6" fill="none" stroke="currentColor"/><text x="587" y="80" text-anchor="middle" fill="currentColor" font-weight="600">Deliver</text><text x="587" y="100" text-anchor="middle" fill="var(--muted)" font-size="11">Foxit eSign</text>
+    <path d="M634 84h10" stroke="currentColor" fill="none"/>
+    <rect x="644" y="52" width="94" height="64" rx="6" fill="none" stroke="currentColor"/><text x="691" y="80" text-anchor="middle" fill="currentColor" font-weight="600">Persist</text><text x="691" y="100" text-anchor="middle" fill="var(--muted)" font-size="11">Xano</text>
+    <path d="M679 116v40" stroke="var(--curve)" fill="none"/>
+    <text x="20" y="176" fill="var(--muted)">Outside the boundary: no agent holds these</text>
+    <rect x="20" y="190" width="200" height="56" rx="6" fill="none" stroke="var(--mark)" stroke-width="2"/><text x="120" y="214" text-anchor="middle" fill="var(--mark)" font-weight="600">signature.execute</text><text x="120" y="233" text-anchor="middle" fill="var(--muted)" font-size="11">person only</text>
+    <rect x="240" y="190" width="200" height="56" rx="6" fill="none" stroke="var(--mark)" stroke-width="2"/><text x="340" y="214" text-anchor="middle" fill="var(--mark)" font-weight="600">payment.release</text><text x="340" y="233" text-anchor="middle" fill="var(--muted)" font-size="11">person only</text>
+    <text x="470" y="214" fill="currentColor">Deliver leaves the envelope in draft;</text><text x="470" y="232" fill="currentColor">a denial is written to the audit log</text>
+    </svg>
+    <figcaption>The seven stages run inside the agent boundary. The two human-only capabilities are declared but held by no agent. Based on <code>fleet/capabilities.py</code>, where nine capabilities are in the agent set.</figcaption>
+    </figure>
+    <p>The envelope preparer requests the signature on every run and is refused every time. The refusal is an audit row, for example <code>seq=5 envelope-preparer foxit_execute_signature deny</code>, rather than a silent omission.</p>
+  </section>
+
+  <section id="results"><h2><span class="n">4</span>Results</h2>
+    <h3>Labelled benchmark</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Metric</th><th class="num">Result</th><th>Measured on</th></tr></thead>
+      <tbody>
+      <tr><td>Verdict accuracy, including 2 negatives</td><td class="num">6/6</td><td>6 labelled invoices, live APIs</td></tr>
+      <tr><td>Same invoice twice, same verdict</td><td class="num">6/6</td><td>2 runs per invoice</td></tr>
+      <tr><td>Citations matching collected evidence</td><td class="num">35/35</td><td>All verdict citations</td></tr>
+      <tr><td>Providers cited in verdicts</td><td class="num">3/3</td><td>name.com, Nutrient, SerpApi</td></tr>
+      <tr><td>Signature denied</td><td class="num">12/12</td><td>Every benchmark run</td></tr>
+      <tr><td>Probes denied through the real gate</td><td class="num">4/4</td><td>Probe raises if the gate lets it through</td></tr>
+      <tr><td>Human-only powers denied</td><td class="num">16/16</td><td>Every agent against every reserved power</td></tr>
+      <tr><td>Median latency</td><td class="num">40.4 s</td><td>Benchmark runs</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: six invoices from one template, two runs each, live providers, known official domain held fixed. This measures reproducibility and the signal logic. It is not a claim about accuracy on real mail. A fabricated source was also rejected, and a legitimately granted call was still allowed, which rules out a gate that passes by denying everything.</p>
+    <h3>Soak test</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Metric</th><th class="num">Result</th><th>Measured on</th></tr></thead>
+      <tbody>
+      <tr><td>Detection of fraudulent runs</td><td class="num">8/8</td><td>4 fraudulent cases, 2 passes</td></tr>
+      <tr><td>False positives (flagged, legitimate)</td><td class="num">9/32 (28.1%)</td><td>16 legitimate cases, 2 passes</td></tr>
+      <tr><td>Would block a real payment</td><td class="num">2/32 (6.2%)</td><td>Same legitimate runs</td></tr>
+      <tr><td>Verdict stability across passes</td><td class="num">19/20</td><td>20 cases</td></tr>
+      <tr><td>Signature denied</td><td class="num">40/40</td><td>All soak runs</td></tr>
+      <tr><td>Latency p50 / p95</td><td class="num">26.3 s / 42.5 s</td><td>40 runs</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: <code>demo/soak</code>, 20-invoice corpus, 40 runs over 2 passes, five concurrent. The corpus is 80% legitimate because fraud is rare and a balanced set would misstate the problem. The generation and delivery stages were closed in the soak, so latency excludes them. These are my own in-repo measurements, not an external evaluation.</p>
+    <h3>False-positive trajectory</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Stage of the fix</th><th class="num">False-positive rate</th></tr></thead>
+      <tbody>
+      <tr><td>First soak</td><td class="num">80.7%</td></tr>
+      <tr><td>After the first round of fixes</td><td class="num">50.0%</td></tr>
+      <tr><td>After the second round</td><td class="num">28.1%</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: the three figures are quoted from the README, which gives the trajectory but not the per-round corpus or run counts. Only the final 28.1% (9/32) is backed by the report file in the repository.</p>
+    <h3>One live run</h3>
+    <p>In the worked case name.com is the impersonated vendor and <code>narne.com</code> the fictional fraudulent sender, using an <code>rn</code> for <code>m</code> substitution. The run checked 24 names, found 8 confusables already registered, scored the invoice high at 1.00 on 3 signals from 17 evidence items, left Foxit envelope 35674834 in draft, wrote 10 audit rows to Xano, and was refused the signature. Nothing was mocked. I state registry facts only and make no claim about whoever holds that domain.</p>
+  </section>
+
+  <section id="negative"><h2><span class="n">5</span>What did not work</h2>
+    <h3>The false-positive rate is still 28.1%</h3>
+    <p>After two rounds of fixes, 9 of 32 legitimate runs were flagged and 2 of 32 would have blocked a real payment. All five flagged legitimate cases are listed in the soak report, and the blocked one is a legitimate sibling TLD. A domain registry can say a variant is taken, not whether <code>name.net</code> belongs to the same company as <code>name.com</code>. I left this named rather than tuning it away, and I would not deploy the control as it stands.</p>
+    <h3>The soak found defects the benchmark did not</h3>
+    <p>The benchmark passed 6/6 while two real bugs sat underneath. The vendor baseline was written from whatever invoice arrived first, so a supplier whose first invoice was fraudulent would have had the attacker's account enrolled as its baseline. And billing subdomains were compared to the official domain by string equality, so every legitimate invoice from <code>invoices.name.com</code> carried the vendor's own confusable surface as a finding against it. The README ties the drop from 80.7% to 28.1% to fixing defects like these; it does not break the drop down per defect.</p>
+    <h3>Verdicts moved between runs</h3>
+    <p>One case, a clean legitimate name.com invoice, returned review on one pass (score 0.35) and clear on the next (score 0) with the same single signal. That is the 19/20 stability figure. Four times during the build, a fact a rule could settle had been given to a model and came out differently between runs, or not at all: the sender domain, the bank-detail change, the IBAN, and the sender-versus-official comparison. Settled signals now travel with the evidence and take precedence over the model's draft.</p>
+    <h3>Providers and integrations</h3>
+    <p>In the soak, 23 stage executions were degraded or failed, with 4 SerpApi faults and 1 Vertex fault recorded, and every run still produced a verdict. Doctavian is integrated but was never configured: its OAuth consent screen was in testing mode and rejected my Workspace account with <code>403 access_denied</code>, so Foxit PDF Services covers generation. Foxit's envelope fetcher also could not download from every public host; <code>raw.githubusercontent.com</code> worked while <code>w3.org</code> and <code>africau.edu</code> failed with a generic download error.</p>
+    <h3>Open evaluation limits</h3>
+    <p>The benchmark is six invoices from one template, accuracy is measured given a known official domain, and the domain sweep reports registered or available, never who owns it. I do not know the hackathon result.</p>
+  </section>
+
+  <section id="lessons"><h2><span class="n">6</span>Lessons</h2>
+    <ul>
+      <li>Declare the forbidden capabilities and deny them on the record. An attempt that resolves to a named capability is auditable; one that cannot be expressed leaves no trace.</li>
+      <li>Fail closed on anything undeclared, and test the gate in both directions: a granted call must still pass, or a deny-everything gate would score perfectly.</li>
+      <li>A control is judged by how often it flags real work. The 8/8 detection figure means little next to a 28.1% false-positive rate, and a benchmark with two negatives did not show it.</li>
+      <li>Do not give a model facts a rule can settle. Four separate cases pointed the same way, and the fix each time was to let the settled signal outrank the model's draft.</li>
+      <li>Run a repeated soak on a realistic class balance early. It found the baseline-enrolment and subdomain defects that a single labelled pass missed.</li>
+    </ul>
+  </section>
+  <nav class="pager" aria-label="More work"><a href="trainium-phase-1.html">Trainium Phase 1</a><a href="gradesync.html">GradeSync</a></nav>
+</main>
+<footer><div class="wrap"><span>Carlos Sanoja</span><span class="foot-links"><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a><a href="https://orcid.org/0009-0000-0339-7072">ORCID</a></span></div></footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

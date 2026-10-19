@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trainium Pretraining Race | Carlos Sanoja</title>
+  <meta name="description" content="Pretraining a language model from scratch on one Trainium2 chip in 30 minutes: how I reached 3rd place in Phase 1 with an official val_bpb of 0.947182.">
+  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="icon" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="../index.html"><img src="../favicon.svg" width="28" height="28" alt=""><span>Carlos Sanoja</span></a>
+  <nav aria-label="Site"><a href="../index.html#work">Work</a><a href="../about.html">About</a><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a></nav>
+  <button class="theme" type="button" aria-label="Switch between light and dark theme"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+</div></header>
+<main class="paper">
+  <a class="back" href="../index.html#work">All work</a>
+  <h1>Pretraining against the clock on one Trainium2 chip</h1>
+  <div class="meta"><span>August 2026 to October 2026</span><span>AWS Trainium Frontier Competition, Phase 1</span><span class="live">3rd place, advanced to Phase 2</span></div>
+  <div class="links"><a class="btn primary" href="https://trainium-frontier.devpost.com/">Competition page</a><a class="btn" href="https://github.com/CarSanoja">GitHub</a></div>
+  <p class="abstract">The task was to train a language model from scratch on one Trainium2 chip with a 30-minute training clock, scored by validation bits per byte (val bpb, lower is better). I started from the organizers' dense GPT baseline and changed the model shape, batch and schedule, compile-clock handling, kernels and numeric precision, one measured change at a time. The best official leaderboard score was 0.947182 (package 48, submitted 30 September 2026), which placed 3rd and passed the cut to the 10-team Phase 2. Phase 2 is still running, so this page covers Phase 1 only and stays at the level of technique categories.</p>
+  <nav class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#problem">Problem</a></li><li><a href="#approach">Approach</a></li><li><a href="#protocol">Protocol</a></li><li><a href="#results">Results</a></li><li><a href="#negative">What did not work</a></li><li><a href="#lessons">Lessons</a></li></ol></nav>
+
+  <section id="problem"><h2><span class="n">1</span>Problem</h2>
+    <p>Phase 1 ran from 31 August to 30 September 2026. Each submission trains a language model from scratch on a single Trainium2 chip (a trn2.3xlarge instance) for 30 minutes of training clock, with compile and startup time excluded. The score is val bpb on a fixed shard of about 20 million tokens. The starting point is a dense GPT of roughly 50 to 60 million parameters derived from nanochat, using RMSNorm, rotary embeddings, a squared-ReLU MLP, and Muon plus AdamW. Almost everything can change except the data, tokenizer, preparation script and scoring harness. Teams get five submissions per week, and the top 10 advance.</p>
+    <p>The first thing I did was read the real training configuration instead of trusting the documentation. The baseline trained 59.6 million parameters on 1,000 steps of 65,536 tokens, about 1.1 tokens per parameter, at roughly 37.6 thousand tokens per second (about 13.4 TFLOP/s). That is a model far too large for the tokens it sees. I also found that my own first throughput estimate, made before reading the code, was off by a factor of 27, and I corrected it in the log.</p>
+  </section>
+  <section id="approach"><h2><span class="n">2</span>Approach</h2>
+    <p>The work was a stack of small, separately measured changes rather than one recipe. By category:</p>
+    <ul>
+      <li><b>Shape for the hardware.</b> Depth, width and which layers carry attention were re-chosen so matrix dimensions fit the 128 by 128 systolic array, and the model was made smaller for the number of tokens it can see.</li>
+      <li><b>Batch and schedule.</b> Batch size and the learning-rate schedule were swept and then fixed.</li>
+      <li><b>Compile-clock handling.</b> Compilation is outside the budget, so graph structure and packing were tuned to spend the 30 minutes on training.</li>
+      <li><b>Custom kernels.</b> Fused, hand-written NKI kernels replaced slow parts of the training step.</li>
+      <li><b>Mixed precision.</b> Higher-precision master weights, plus 8-bit floating point on part of the matrix multiplications late in the phase.</li>
+    </ul>
+    <p>Profiling drove the order. Training ran at 90 to 98 percent of the chip's power cap, the matrix engine was the bottleneck and was throttled by power, and each new wide tensor cost about 10 percent of step time. Those three facts decided which ideas were worth a trial. In all, 49 numbered packages are in the submissions directory of the private repository, with hundreds of dated log entries.</p>
+  </section>
+  <section id="protocol"><h2><span class="n">3</span>Protocol</h2>
+    <p>Every idea went through the same gates, because a 30-minute run on a rented chip is the scarce resource.</p>
+    <ul>
+      <li><b>Hypothesis first.</b> The expected effect and the rule for accepting or rejecting it were written before the run. An adversarial reviewer then tried to break the conclusion before anything was built on it.</li>
+      <li><b>Validation ladder.</b> CPU check, then a one-core probe, then a short smoke run, then the full 30-minute run with the exact package. Each rung exists because the one below it misses something: a CPU run does not show that a kernel executes on the chip.</li>
+      <li><b>Noise characterisation.</b> A change counts only against measured noise. Seed spread, pair noise and the local-to-official offset are given in the results.</li>
+      <li><b>Elasticity.</b> To turn a compute change into bpb, I measured bpb against ln(steps) instead of assuming a constant.</li>
+      <li><b>Compliance.</b> Anything that might read as outside the rules was checked before spending a submission slot.</li>
+    </ul>
+  </section>
+  <section id="results"><h2><span class="n">4</span>Results</h2>
+    <figure><svg viewBox="0 0 560 270" role="img" aria-labelledby="t1-t t1-d">
+<title id="t1-t">Official Phase 1 scores</title>
+<desc id="t1-d">Sixteen official submissions between September 3 and September 30, 2026. Validation bits per byte fell from 1.1728 to 0.947182. Lower is better.</desc>
+<g stroke="var(--rule)" stroke-width="1"><line x1="56" x2="540" y1="206.2" y2="206.2"/><line x1="56" x2="540" y1="166.6" y2="166.6"/><line x1="56" x2="540" y1="127.0" y2="127.0"/><line x1="56" x2="540" y1="87.4" y2="87.4"/><line x1="56" x2="540" y1="47.8" y2="47.8"/></g>
+<g font-family="JetBrains Mono, monospace" font-size="11" fill="var(--muted)"><text x="48" y="210.2" text-anchor="end">0.95</text><text x="48" y="170.6" text-anchor="end">1.00</text><text x="48" y="131.0" text-anchor="end">1.05</text><text x="48" y="91.4" text-anchor="end">1.10</text><text x="48" y="51.8" text-anchor="end">1.15</text></g>
+<g font-family="Archivo, sans-serif" font-size="11.5" fill="var(--muted)"><text x="89.4" y="258" text-anchor="middle">Sep 3</text><text x="206.2" y="258" text-anchor="middle">Sep 10</text><text x="323.0" y="258" text-anchor="middle">Sep 17</text><text x="439.9" y="258" text-anchor="middle">Sep 24</text><text x="540.0" y="258" text-anchor="middle">Sep 30</text></g>
+<path d="M89.4,29.7 L122.8,118.0 L127.8,142.3 L139.4,159.8 L144.4,164.3 L156.1,167.7 L206.2,185.4 L289.7,189.6 L294.7,190.7 L489.9,190.7 L494.9,192.1 L499.9,193.8 L506.6,195.4 L530.0,206.7 L535.0,207.4 L540.0,208.5" fill="none" stroke="var(--curve)" stroke-width="2.2" stroke-linejoin="round"/>
+<g fill="var(--curve)"><circle cx="89.4" cy="29.7" r="3.2"/><circle cx="122.8" cy="118.0" r="3.2"/><circle cx="127.8" cy="142.3" r="3.2"/><circle cx="139.4" cy="159.8" r="3.2"/><circle cx="144.4" cy="164.3" r="3.2"/><circle cx="156.1" cy="167.7" r="3.2"/><circle cx="206.2" cy="185.4" r="3.2"/><circle cx="289.7" cy="189.6" r="3.2"/><circle cx="294.7" cy="190.7" r="3.2"/><circle cx="489.9" cy="190.6" r="3.2"/><circle cx="494.9" cy="192.1" r="3.2"/><circle cx="499.9" cy="193.8" r="3.2"/><circle cx="506.6" cy="195.4" r="3.2"/><circle cx="530.0" cy="206.7" r="3.2"/><circle cx="535.0" cy="207.4" r="3.2"/><circle cx="540.0" cy="208.5" r="3.2"/></g>
+<circle cx="540.0" cy="208.5" r="7" fill="none" stroke="var(--mark)" stroke-width="2"/>
+<text x="528.0" y="227.5" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="12.5" fill="var(--ink)">0.947182, final 3rd</text>
+<text x="99.4" y="33.7" font-family="JetBrains Mono, monospace" font-size="12.5" fill="var(--ink)">1.1728, 1st on day one</text>
+</svg><figcaption>All 16 official submissions in Phase 1 with the running best, from 1.1728 on 3 September to 0.947182 on 30 September 2026. Lower is better.</figcaption></figure>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Package</th><th>Date (UTC)</th><th class="num">Official val bpb</th><th>Board position then</th></tr></thead>
+      <tbody>
+        <tr><td>P25</td><td>15 Sep</td><td class="num">0.97096</td><td>3rd</td></tr>
+        <tr><td>P26</td><td>15 Sep</td><td class="num">0.969589</td><td>3rd, later 6th</td></tr>
+        <tr><td>P32</td><td>27 Sep</td><td class="num">0.967877</td><td>5th</td></tr>
+        <tr><td>P36</td><td>28 Sep</td><td class="num">0.963663</td><td>4th</td></tr>
+        <tr><td>P44</td><td>30 Sep</td><td class="num">0.949406</td><td>3rd</td></tr>
+        <tr><td>P46</td><td>30 Sep</td><td class="num">0.948537</td><td>4th</td></tr>
+        <tr><td>P48</td><td>30 Sep</td><td class="num">0.947182</td><td>3rd, final</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: all values above are official leaderboard scores on the held-out evaluation, one submission each. The board at close put the 10th place at 0.955399, a margin of 0.0082 for my entry, and the leader about 0.0144 ahead. Official evaluations take about 40 minutes to appear.</p>
+    <h3>Noise and the local-to-official offset</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Quantity</th><th class="num">Value</th><th>Measured on</th></tr></thead>
+      <tbody>
+        <tr><td>Effect of one setting, seed 44 vs seed 42</td><td class="num">-0.000690 vs +0.001141</td><td>Local, each against its own seed control</td></tr>
+        <tr><td>Pair noise floor</td><td class="num">0.000208</td><td>Local, paired runs</td></tr>
+        <tr><td>Same code and seed, repeated, 8-bit setup</td><td class="num">0.960271 vs 0.962237</td><td>Local, n=2</td></tr>
+        <tr><td>Local-to-official offset, five packages</td><td class="num">-0.0012 &plusmn; 0.0010</td><td>Local mean vs official, n=5</td></tr>
+        <tr><td>Offsets in the 8-bit era (P35, P36, P38, P44, P46)</td><td class="num">-0.00086 to -0.001458</td><td>Local run of the same seed vs official</td></tr>
+        <tr><td>bpb per ln(steps), 1200 to 1700 s</td><td class="num">0.06163</td><td>Local, n=2 per point, seed 44</td></tr>
+        <tr><td>bpb per ln(steps), 1700 to 1800 s</td><td class="num">0.05538</td><td>Local, n=2 per point, seed 44</td></tr>
+        <tr><td>bpb per ln(steps), 1800 to 2700 s</td><td class="num">0.04626</td><td>Local, n=2 per point, seed 44</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: local numbers are from 30-minute runs on the same chip type, not the leaderboard. The offset is not constant (it ranged from -0.0003 to -0.0033 across packages 22 to 32), so I quote it with its spread and never as a band around one point.</p>
+    <p>Two consequences shaped the plan. First, the slope of bpb against ln(steps) falls as the clock grows, so extra compute buys less than a constant slope suggests. Using the slope near the 30-minute budget, closing the 0.0144 gap to the leader would take roughly 30 to 37 percent more effective compute. Second, a single official evaluation cannot settle effects below about 0.003, so small gains were stacked locally and sent inside larger packages. I also measured the in-context-learning benchmark CORE once, on a single checkpoint on 20 September: 0.1073, against 0.1139 for GPT-2 124M. That is one measurement and says nothing about the lineage of packages.</p>
+  </section>
+  <section id="negative"><h2><span class="n">5</span>What did not work</h2>
+    <h3>A predicted gain that the leaderboard could not see</h3>
+    <p>I predicted that a wider MLP variant would improve P26 by 0.00055. The official score for the package was 0.9697 against 0.969589 for P26, outside the predicted interval of 0.9686 to 0.9694. The local effect was smaller than what one official evaluation can separate from zero, so the submission slot bought no information.</p>
+    <h3>A speedup that was a debug flag</h3>
+    <p>An 8-bit MLP looked 27 percent faster in integration. The comparison arm without the flag showed that a debugging environment variable had been set on only one arm. Without it, the same operation ran 340 steps at 0.5212 s per step against 0.5308 s for bf16, about 1.8 percent faster.</p>
+    <h3>Seed lottery</h3>
+    <p>A sweep of six new seeds gave 0.965547 to 0.966626 locally (sd 0.00037), and none beat the existing two-run mean of 0.964177. Seed effects swing by about 0.0018, and a repeat of the same code and seed moved by 0.002 in the 8-bit setup, so a single run proves nothing about a seed. The last submission, P48, was a seed choice on the P46 code. It was worth about 0.0014, which is not a research result.</p>
+    <h3>Dead ends in hardware and design</h3>
+    <p>Attention in blocks of 128 crashed at run time. Sequence lengths below 512 were worse, and step time was flat between 512 and 1024. A scatter mode in a custom kernel aborted on the chip with a runtime error that the simulator never showed. A later architectural variant measured 0.001048 worse than the incumbent (n=2), and the optimizer and inter-replica agreement lines were closed with no measurable lever.</p>
+    <h3>Measuring the wrong thing</h3>
+    <p>My own CORE meter had three bugs worth +0.0480 that all passed 8 of 8 self-checks, and I caught them only later.</p>
+    <h3>A compliance negative result</h3>
+    <p>I built a scheme that used the training corpus as a non-parametric component at evaluation time. The organizers' review rejected it on 27 September, because what was evaluated differed from what was trained. The submission slot was spent, and I treat the rule as binding for anything similar.</p>
+    <h3>Calendar</h3>
+    <p>The rented chip block ended 30 minutes before its nominal end, which left about 20 hours at the end of Phase 1 with no chip to measure on.</p>
+  </section>
+  <section id="lessons"><h2><span class="n">6</span>Lessons</h2>
+    <ul>
+      <li>Read the real configuration before estimating anything. The baseline was badly mismatched to its token budget, and that was visible only in the code.</li>
+      <li>Write the decision rule before the run. Most of my corrections came from a rule I had fixed in advance.</li>
+      <li>A slope fitted in one range is not valid outside it. The elasticity of bpb against ln(steps) fell with clock length, so extrapolating upward overstated the value of compute.</li>
+      <li>One run is one draw. Replicate in the same seed to test the number, and across seeds to test transfer.</li>
+      <li>Treat a cheap probe on another backend as evidence about that backend only. CPU runs and the kernel simulator accepted things the chip rejected.</li>
+      <li>Phase 2 is ongoing until 4 November 2026. On 19 October 2026 Team Quanta was 5th of 10 on the public board. I will write that phase up after it closes.</li>
+    </ul>
+  </section>
+  <nav class="pager" aria-label="More work"><a href="biohub-cell-tracking.html">Biohub cell tracking</a><a href="countersign.html">Countersign</a></nav>
+</main>
+<footer><div class="wrap"><span>Carlos Sanoja</span><span class="foot-links"><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a><a href="https://orcid.org/0009-0000-0339-7072">ORCID</a></span></div></footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

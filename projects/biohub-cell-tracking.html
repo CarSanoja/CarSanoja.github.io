@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Biohub cell tracking | Carlos Sanoja</title>
+  <meta name="description" content="Zebrafish cell detection and lineage tracking in 3D+time microscopy: oracle experiments, a local reproduction of the ILP linker, and a public leaderboard climb from 0.608 to 0.946.">
+  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="icon" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="../index.html"><img src="../favicon.svg" width="28" height="28" alt=""><span>Carlos Sanoja</span></a>
+  <nav aria-label="Site"><a href="../index.html#work">Work</a><a href="../about.html">About</a><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a></nav>
+  <button class="theme" type="button" aria-label="Switch between light and dark theme"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+</div></header>
+<main class="paper">
+  <a class="back" href="../index.html#work">All work</a>
+  <h1>Biohub: cell tracking during development</h1>
+  <div class="meta"><span>August 2026 to September 2026</span><span>Kaggle competition</span><span class="live">Ended Sep 29 2026, best public score 0.946</span></div>
+  <div class="links"><a class="btn primary" href="https://www.kaggle.com/competitions/biohub-cell-tracking-during-development">Competition page</a><a class="btn" href="https://www.kaggle.com/charlieesv">Kaggle profile</a></div>
+  <p class="abstract">The task is to detect cells in 3D+time microscopy of zebrafish embryos and link them into lineages, including divisions. I started from public notebooks (a detector pack and an ILP linker) and spent most of the work measuring where the score was actually lost. With perfect detection, nearest-neighbour linking recovers 97.8% of edges on the training data, so linking was not the bottleneck. My best public leaderboard score was 0.946 on Sep 6, against a seventh place at 0.953 and a leader at 0.970 on Sep 5. The final private-leaderboard placement is not reported here. This page is mostly about the measurements and the ideas that were refuted.</p>
+  <nav class="toc" aria-label="Contents"><b>Contents</b><ol><li><a href="#problem">Problem</a></li><li><a href="#approach">Approach</a></li><li><a href="#results">Results</a></li><li><a href="#negative">What did not work</a></li><li><a href="#lessons">Lessons</a></li></ol></nav>
+
+  <section id="problem"><h2><span class="n">1</span>Problem</h2>
+    <p>Each sample is a 3D+time movie of a developing zebrafish embryo. A submission is a graph: nodes are detected cells, edges link the same cell across frames, and a division is a node with two children. The score is <code>adjusted_edge_jaccard + 0.1 * division_jaccard</code>. The prize pool was $60,000 over seven places. Five submissions per day were allowed and two counted at the end.</p>
+    <p>Three properties of the metric shaped the work. The ground truth is sparse: only about 2.8% of nodes were annotated overall (133318 of 4725117, 6.1% on average per sample), so an edge only counts as a false positive if it touches an annotated node. The metric weights samples by size, so large dense movies dominate. And the whole training set holds only 151 divisions, which makes the division term both the largest opportunity and the largest source of variance.</p>
+    <p>In the early weeks more than a thousand teams were bunched between 0.91 and 0.93. On Sep 5 the seventh place stood at 0.953 and the leader at 0.970.</p>
+  </section>
+
+  <section id="approach"><h2><span class="n">2</span>Approach</h2>
+    <p>I built on public notebooks: a pretrained detector pack released under CC0 and an ILP linker from tracksdata, plus a public notebook family that sat on a plateau around 0.933 to 0.940. I did not finish training a new detector; a local training run on a laptop was stopped before its first checkpoint. Estimated cost in the notes was 2.5 to 5 hours per epoch on a T4, with no resume, so training on the shared Kaggle GPU quota was out of reach.</p>
+    <h3>Oracle experiments first</h3>
+    <p>Before tuning anything I asked which stage could move the score. With perfect detection and nearest-neighbour linking, 97.8% of edges are recovered, and greedy linking ties the Hungarian assignment. The oracle (perfect detection plus nearest neighbour) scores 1.0674 with the official scorer, which says the metric is not capped by linking. On the real detector, node recall on ground-truth nodes was 0.984 weighted (20 graphs with ground truth, minimum 0.92), so detection headroom was about +0.01.</p>
+    <h3>Local reproduction of the ILP</h3>
+    <p>I dumped candidate graphs from two movies and reproduced Kaggle's ILP solution edge by edge locally with ilpy 0.6 and SCIP, in about 2 seconds. That gave an off-GPU bench for solver weights and thresholds. I also built a local run of the post-processing chain scored with the official scorer; on one movie it matched the Kaggle validator.</p>
+    <h3>Cheap reruns</h3>
+    <p>A stub notebook skips inference and reuses cached outputs, so a visible rerun cost 0.4 minutes of GPU instead of 15 to 60. That turned the daily submission limit, not GPU quota, into the real budget, and I used it to probe public-notebook parameters on the leaderboard.</p>
+    <figure>
+      <svg viewBox="0 0 520 190" role="img" aria-label="Bar chart of selected public leaderboard scores over time">
+        <line x1="40" y1="150" x2="510" y2="150" stroke="var(--rule)"/>
+        <g fill="var(--curve)">
+          <rect x="52" y="105" width="44" height="45"/>
+          <rect x="116" y="63" width="44" height="87"/>
+          <rect x="180" y="22" width="44" height="128" fill="var(--muted)"/>
+          <rect x="244" y="19" width="44" height="131"/>
+          <rect x="308" y="17" width="44" height="133"/>
+          <rect x="372" y="14" width="44" height="136"/>
+          <rect x="436" y="12" width="44" height="138" fill="var(--accent)"/>
+        </g>
+        <g fill="currentColor" font-size="11" text-anchor="middle">
+          <text x="74" y="100">0.608</text><text x="138" y="58">0.881</text><text x="202" y="17">0.933</text><text x="266" y="14">0.940</text><text x="330" y="12">0.942</text><text x="394" y="9">0.945</text><text x="458" y="7">0.946</text>
+          <text x="74" y="168">Aug 30</text><text x="138" y="168">Sep 2</text><text x="202" y="168">Sep 2</text><text x="266" y="168">Sep 4</text><text x="330" y="168">Sep 4</text><text x="394" y="168">Sep 5</text><text x="458" y="168">Sep 6</text>
+        </g>
+      </svg>
+      <figcaption>Selected public leaderboard scores. The vertical axis is truncated near 0.77 and the 0.608 bar is drawn out of scale, so heights are not proportional to score. The grey bar is the unmodified public notebook fork.</figcaption>
+    </figure>
+  </section>
+
+  <section id="results"><h2><span class="n">3</span>Results</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Change</th><th class="num">Score</th><th>Measured on</th></tr></thead>
+      <tbody>
+        <tr><td>First submission</td><td class="num">0.608</td><td>Public leaderboard, Aug 30</td></tr>
+        <tr><td>Second submission</td><td class="num">0.662</td><td>Public leaderboard, rank 2361 of 2900 on Aug 30</td></tr>
+        <tr><td>Pack head, division gate 0.3, short-track pruning</td><td class="num">0.881</td><td>Public leaderboard, Sep 2</td></tr>
+        <tr><td>Unmodified fork of the 0.933 public notebook</td><td class="num">0.933</td><td>Public leaderboard, Sep 2</td></tr>
+        <tr><td>Fork of the 0.940 public notebook</td><td class="num">0.940</td><td>Public leaderboard, Sep 4</td></tr>
+        <tr><td>Plus CC0 pack weights from epoch 400</td><td class="num">0.942</td><td>Public leaderboard, Sep 4</td></tr>
+        <tr><td>Plus second-seed detection fusion at weight 0.5</td><td class="num">0.945</td><td>Public leaderboard, Sep 5</td></tr>
+        <tr><td>Plus detection threshold 0.95</td><td class="num">0.946</td><td>Public leaderboard, Sep 6 (35th of 3177 at the time)</td></tr>
+        <tr><td>Division module switched off</td><td class="num">0.906</td><td>Public leaderboard, Sep 7 (a drop of 0.040)</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Measurement: every score above is the Kaggle public leaderboard, which covers about 29% of the test set, one submission each (n=1). Public scores carry a shakeup risk; the final private-leaderboard placement is not reported here and I do not claim one. The 0.946 is my best public score, not a final result.</p>
+    <p>The most useful numbers were diagnostic rather than leaderboard moves. Switching the division module off cost 0.040 on the hidden test, so divisions are worth about 0.040 there (division Jaccard around 0.40 on the hidden test against 0.20 on my local bench of 16 graphs). Of 2598 edge failures over 60 training samples, 72% were association errors and 28% were detection errors. On two dumped movies the correct target was inside the top 8 candidates before thresholding in every case, and for 65% of the 31 failures with both endpoints detected, the 0.48 threshold had dropped the right candidate at rank 1.</p>
+  </section>
+
+  <section id="negative"><h2><span class="n">4</span>What did not work</h2>
+    <h3>Greedy linking and the per-column cross-entropy head</h3>
+    <p>Replacing the ILP with greedy linking put submissions 7 and 8 below the pure public baseline of 0.894 to 0.896 (pack plus the tracksdata ILP); the best of them scored 0.881 on the leaderboard. Retraining the edge head with a per-column cross-entropy loss scored 0.874 on the leaderboard. The loss never sees detections without a parent, so it linked noise: 27% more nodes and nearly twice as many forks on one sample. My window benchmark was blind to exactly that case.</p>
+    <h3>Pruning and division gates</h3>
+    <p>An early short-track pruning rule cost 0.045. Sweeping the minimum track length on the official scorer (16 graphs) gave 0.9100 at 1, 0.9105 at 6 and 0.9010 at 10, so the public default of 6 was already the optimum. The public division gates were a local optimum in all 13 variants I swept; the one that looked better (+0.0016) turned out to be noise. On the leaderboard, halving the gate caps scored 0.941 and an eighth scored 0.922.</p>
+    <h3>Changing the ILP division weight</h3>
+    <p>Lowering the division weight to 0.5 scored 0.917, below the 0.933 floor. The reason is in the solver: with edge weight -1.0 and division weight 1.2, the margin of any division is non-negative, so the public ILP never divides (0 forks in 414256 nodes, against 2457 at weight 0.5). All divisions come from post-processing. At 0.5 the solver and the post-processing both emit forks and the false positives add up.</p>
+    <h3>A motion model, and detection tuning</h3>
+    <p>I refuted a motion model before building it: of 300 association failures with matched ground truth, 38% were gaps with no successor, and the local motion field was right in 7% and preferred the wrong rival in 90.9%. Detection threshold probes landed at 0.940 (0.98) and 0.933 (0.99). The second-seed weight curve is not smooth: 0.5 gave 0.945, while 0.3 and 0.0 gave 0.935 and 0.934. Eleven knob probes in total stayed between 0.933 and 0.946.</p>
+    <h3>Local benches that did not transfer</h3>
+    <p>Turning off the motion relink gained 0.016 in edges on a four-sample bench but scored 0.932 on the leaderboard, because it helped the small samples and hurt the large dense one that dominates the weighted metric. The local bench predicted the direction of leaderboard changes but not their size, which was two to three times larger for divisions.</p>
+  </section>
+
+  <section id="lessons"><h2><span class="n">5</span>Lessons</h2>
+    <ul>
+      <li>Run the oracle experiment before choosing a stage to improve. Here it showed that the stage I had already spent two submissions on was not the constraint.</li>
+      <li>State an expected range per change from the per-sample spread, not the mean. With fewer than 10 samples the range must include "no change". Three of my declared ranges failed before I adopted this rule.</li>
+      <li>Read the scorer. Its sample weighting and sparse ground truth explained results that looked inconsistent, and the 0.040 value of the division module only appeared by switching it off on the real test.</li>
+      <li>Be wary of a solver weight whose name suggests a direction. Raising the division weight to 1.2 "to encourage divisions" made divisions unprofitable.</li>
+      <li>I could not close the gap to the top because the top teams retrained the detector and my budget did not allow it. Building tools that do not need the GPU (the local ILP, the post-processing replay, the stub rerun) was the productive response to that limit, but it did not change the ceiling.</li>
+    </ul>
+  </section>
+  <nav class="pager" aria-label="More work"><a href="repaso.html">Repaso</a><a href="trainium-phase-1.html">Trainium Pretraining Race</a></nav>
+</main>
+<footer><div class="wrap"><span>Carlos Sanoja</span><span class="foot-links"><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a><a href="https://orcid.org/0009-0000-0339-7072">ORCID</a></span></div></footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

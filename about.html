@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About | Carlos Sanoja</title>
+  <meta name="description" content="About Carlos Sanoja: ML research engineer, founder of Quanta Labs, professor at Universidad Monteávila.">
+  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="icon" href="./favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/site.css">
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="./index.html"><img src="./favicon.svg" width="28" height="28" alt=""><span>Carlos Sanoja</span></a>
+  <nav aria-label="Site"><a href="./index.html#work">Work</a><a href="./about.html" aria-current="page">About</a><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a></nav>
+  <button class="theme" type="button" aria-label="Switch between light and dark theme"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+</div></header>
+<main class="paper">
+  <a class="back" href="./index.html">Home</a>
+  <h1>About</h1>
+  <p class="abstract">I&rsquo;m an ML research engineer based in Spain. I work on language-model pretraining under fixed compute, on agent systems that keep a person in charge of the decisions that matter, and on Kaggle and ARC Prize competitions. I founded Quanta Labs and I teach at Universidad Monteávila.</p>
+
+  <section><h2>What I do now</h2>
+    <h3>Founder, Quanta Labs (2025 to present)</h3>
+    <p>Quanta builds AI tools for K-12 schools in Latin America: a multi-tenant learning platform, AI-assisted grading in which the teacher keeps the final word, and offline dictation for teachers. I build it end to end: a FastAPI and Celery backend on PostgreSQL with pgvector, a TypeScript monorepo for the web portals, an Expo mobile app, and the AWS infrastructure in Terraform.</p>
+    <h3>Professor, Universidad Monteávila (2025 to present)</h3>
+    <p>Faculty of Economic and Administrative Sciences, Caracas.</p>
+    <h3>Competitions</h3>
+    <p>AWS Trainium Frontier (3rd in Phase 1, now in the final phase), ARC Prize 2026, and Kaggle competitions in medical imaging and cell tracking. I treat competitions as a way to do research against a referee I do not control.</p>
+  </section>
+
+  <section><h2>How I work</h2>
+    <ul>
+      <li><b>State the hypothesis before the measurement.</b> Every run in my ledgers has its prediction written down first, so a result can contradict me.</li>
+      <li><b>Climb a ladder before paying for the full run.</b> CPU check, one core, a smoke run, a short run, then the expensive one. Most bad ideas die on the cheap rungs.</li>
+      <li><b>Know the noise floor.</b> I measure seed spread and pair noise before believing a difference, and I say which reference a number is measured against.</li>
+      <li><b>Let a reviewer try to break it.</b> Claims go through an adversarial review before anything is built on top of them.</li>
+      <li><b>Publish the failures.</b> Every write-up on this site has a section on what did not work, with numbers.</li>
+    </ul>
+  </section>
+
+  <section><h2>Background</h2>
+    <p>I studied at Universidad Simón Bolívar in Caracas, where I started in electronics and embedded systems. From 2017 I moved into robotics: SLAM, localization, 3D perception and reinforcement learning in ROS and Gazebo. Later work covered cloud data engineering on AWS (lakehouse and warehouse pipelines, Kubernetes deployments), Go backends, and medical-imaging models, much of it through Udacity programs whose projects are on my GitHub.</p>
+  </section>
+
+  <section><h2>Tools</h2>
+    <div class="table-wrap"><table>
+      <tbody>
+        <tr><th>ML</th><td>PyTorch, torch-neuronx and NKI on AWS Trainium, torch_xla on TPU, timm, MLX, SGLang</td></tr>
+        <tr><th>Agents</th><td>Google ADK, Strands Agents, Bedrock AgentCore, MCP, Gemini, Nemotron, Qwen</td></tr>
+        <tr><th>Languages</th><td>Python, TypeScript, C++, Rust, Go</td></tr>
+        <tr><th>Backend and data</th><td>FastAPI, Celery, PostgreSQL with pgvector, Redis, Firestore</td></tr>
+        <tr><th>Cloud</th><td>AWS (EC2 capacity blocks, ECS, Lambda, CDK), Google Cloud (Cloud Run, Pub/Sub), Terraform, Docker</td></tr>
+        <tr><th>Robotics</th><td>ROS, Gazebo, PCL, MoveIt, OpenCV</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section><h2>Contact</h2>
+    <p><a href="https://github.com/CarSanoja">GitHub</a>, <a href="https://www.kaggle.com/charlieesv">Kaggle</a> and <a href="https://orcid.org/0009-0000-0339-7072">ORCID</a>.</p>
+  </section>
+</main>
+<footer><div class="wrap"><span>Carlos Sanoja</span><span class="foot-links"><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a><a href="https://orcid.org/0009-0000-0339-7072">ORCID</a></span></div></footer>
+<script src="./assets/site.js"></script>
+</body>
+</html>

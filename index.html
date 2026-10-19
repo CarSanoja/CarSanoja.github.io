@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carlos Sanoja | ML research engineer</title>
+  <meta name="description" content="Carlos Sanoja, ML research engineer. Language-model pretraining under fixed compute (3rd, AWS Trainium Frontier Phase 1), agent systems with human checkpoints, and honest write-ups of what did not work.">
+  <meta property="og:title" content="Carlos Sanoja | ML research engineer">
+  <meta property="og:description" content="Pretraining under fixed compute, agents that know when to stop, and write-ups that include the failures.">
+  <meta property="og:image" content="https://carsanoja.github.io/assets/img/room.png">
+  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <link rel="icon" href="./favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/site.css">
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="./index.html"><img src="./favicon.svg" width="28" height="28" alt=""><span>Carlos Sanoja</span></a>
+  <nav aria-label="Site"><a href="#work">Work</a><a href="./about.html">About</a><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a></nav>
+  <button class="theme" type="button" aria-label="Switch between light and dark theme"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+</div></header>
+
+<main>
+<div class="room">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="./assets/img/room.png">
+    <img src="./assets/img/room.gif" width="1920" height="732" alt="Pixel-art night scene: a person at a desk watching a loss curve fall to 0.947 and a third-place mark appear, next to a Trainium rack with blinking lights, an ARC puzzle being solved, a robot arm and a drone on a shelf, a chalkboard, and El Avila mountain through the window.">
+  </picture>
+</div>
+
+<div class="wrap intro">
+  <h1>I train language models against the clock.</h1>
+  <p>I&rsquo;m Carlos Sanoja, an ML research engineer. In 2026 I placed <strong>3rd in Phase 1 of the AWS Trainium Frontier Competition</strong>, pretraining a model from scratch on one Trainium2 chip in 30 minutes, and I&rsquo;m now in its 10-team final phase.</p>
+  <p>I also build agent systems that stop and hand control back to a person when the evidence runs out, and I write up what did not work as carefully as what did. I founded Quanta Labs, which builds AI tools for schools in Latin America, and I teach at Universidad Monteávila. Before language models I worked on robotics: SLAM, 3D perception and reinforcement learning for manipulators.</p>
+  <div class="links"><a class="btn primary" href="#work">Read the write-ups</a><a class="btn" href="./about.html">About me</a><a class="btn" href="https://github.com/CarSanoja">GitHub</a></div>
+</div>
+
+<section class="sec" id="work"><div class="wrap">
+  <h2>Selected work</h2>
+  <p class="sub">Each write-up states the problem, the method and the results with their evaluation setting, and has a section on what did not work.</p>
+
+  <article class="lead-work">
+    <div>
+      <div class="when">Aug to Oct 2026 <span class="live">3rd place, Phase 1</span></div>
+      <h3><a href="./projects/trainium-phase-1.html">Pretraining against the clock on one Trainium2 chip</a></h3>
+      <p>AWS Trainium Frontier Competition. Train a language model from scratch in 30 minutes of wall-clock on a single Trainium2 chip, scored on held-out bits per byte. I treated it as a measurement problem: profile first, change one thing, climb a validation ladder before paying for a full run, and pre-register the rule that decides.</p>
+      <p class="score">Official val bpb <b>0.947182</b>, down from 1.1728 over 16 submissions</p>
+    </div>
+    <figure class="chart">
+      <svg viewBox="0 0 560 270" role="img" aria-labelledby="t1-t t1-d">
+<title id="t1-t">Official Phase 1 scores</title>
+<desc id="t1-d">Sixteen official submissions between September 3 and September 30, 2026. Validation bits per byte fell from 1.1728 to 0.947182. Lower is better.</desc>
+<g stroke="var(--rule)" stroke-width="1"><line x1="56" x2="540" y1="206.2" y2="206.2"/><line x1="56" x2="540" y1="166.6" y2="166.6"/><line x1="56" x2="540" y1="127.0" y2="127.0"/><line x1="56" x2="540" y1="87.4" y2="87.4"/><line x1="56" x2="540" y1="47.8" y2="47.8"/></g>
+<g font-family="JetBrains Mono, monospace" font-size="11" fill="var(--muted)"><text x="48" y="210.2" text-anchor="end">0.95</text><text x="48" y="170.6" text-anchor="end">1.00</text><text x="48" y="131.0" text-anchor="end">1.05</text><text x="48" y="91.4" text-anchor="end">1.10</text><text x="48" y="51.8" text-anchor="end">1.15</text></g>
+<g font-family="Archivo, sans-serif" font-size="11.5" fill="var(--muted)"><text x="89.4" y="258" text-anchor="middle">Sep 3</text><text x="206.2" y="258" text-anchor="middle">Sep 10</text><text x="323.0" y="258" text-anchor="middle">Sep 17</text><text x="439.9" y="258" text-anchor="middle">Sep 24</text><text x="540.0" y="258" text-anchor="middle">Sep 30</text></g>
+<path d="M89.4,29.7 L122.8,118.0 L127.8,142.3 L139.4,159.8 L144.4,164.3 L156.1,167.7 L206.2,185.4 L289.7,189.6 L294.7,190.7 L489.9,190.7 L494.9,192.1 L499.9,193.8 L506.6,195.4 L530.0,206.7 L535.0,207.4 L540.0,208.5" fill="none" stroke="var(--curve)" stroke-width="2.2" stroke-linejoin="round"/>
+<g fill="var(--curve)"><circle cx="89.4" cy="29.7" r="3.2"/><circle cx="122.8" cy="118.0" r="3.2"/><circle cx="127.8" cy="142.3" r="3.2"/><circle cx="139.4" cy="159.8" r="3.2"/><circle cx="144.4" cy="164.3" r="3.2"/><circle cx="156.1" cy="167.7" r="3.2"/><circle cx="206.2" cy="185.4" r="3.2"/><circle cx="289.7" cy="189.6" r="3.2"/><circle cx="294.7" cy="190.7" r="3.2"/><circle cx="489.9" cy="190.6" r="3.2"/><circle cx="494.9" cy="192.1" r="3.2"/><circle cx="499.9" cy="193.8" r="3.2"/><circle cx="506.6" cy="195.4" r="3.2"/><circle cx="530.0" cy="206.7" r="3.2"/><circle cx="535.0" cy="207.4" r="3.2"/><circle cx="540.0" cy="208.5" r="3.2"/></g>
+<circle cx="540.0" cy="208.5" r="7" fill="none" stroke="var(--mark)" stroke-width="2"/>
+<text x="528.0" y="227.5" text-anchor="end" font-family="JetBrains Mono, monospace" font-size="12.5" fill="var(--ink)">0.947182, final 3rd</text>
+<text x="99.4" y="33.7" font-family="JetBrains Mono, monospace" font-size="12.5" fill="var(--ink)">1.1728, 1st on day one</text>
+</svg>
+      <figcaption>Every official submission in Phase 1, with the running best. Lower is better.</figcaption>
+    </figure>
+  </article>
+
+  <ul class="rows">
+    <li>
+      <div class="when">Oct 2026 <span class="live">Ongoing</span></div>
+      <div><h3>Trainium Frontier, Phase 2</h3><p>Sixteen Trainium2 chips, four hours per run, scored half on bits per byte and half on the CORE benchmark. The write-up comes after the deadline on November 4.</p><div class="tags"><span>Trainium2</span><span>Neuron SDK</span><span>NKI</span><span>FP8</span></div></div>
+      <div class="res"><b>5th of 10</b> finalists on the public board, Oct 19</div>
+    </li>
+    <li>
+      <div class="when">Aug to Sep 2026</div>
+      <div><h3><a href="./projects/countersign.html">COUNTERSIGN: an agent fleet that cannot sign</a></h3><p>Agents that do vendor onboarding and invoice verification end to end, where signing and paying are capabilities no agent holds. Every risk claim has to cite an evidence span or the verdict is rejected.</p><div class="tags"><span>Gemini on Vertex AI</span><span>Python</span><span>Agent safety</span></div></div>
+      <div class="res">Signature denied in <b>12/12</b> runs; soak-test false positives cut from <b>80.7%</b> to <b>28.1%</b></div>
+    </li>
+    <li>
+      <div class="when">Aug 2026</div>
+      <div><h3><a href="./projects/gradesync.html">GradeSync: grading handwritten exams until a human is needed</a></h3><p>A fleet of Gemini agents on Google Cloud that grades handwritten exams from upload to gradebook, red-teams its own inputs, and holds a paper for the teacher when it should not decide alone.</p><div class="tags"><span>Google ADK</span><span>Cloud Run</span><span>Firestore</span></div></div>
+      <div class="res"><b>96 of 108</b> exams written to the gradebook unattended, 12 held for the teacher</div>
+    </li>
+    <li>
+      <div class="when">Sep 2026</div>
+      <div><h3><a href="./projects/repaso.html">Repaso: learning support with memory you can inspect</a></h3><p>A Telegram tutor on Strands Agents and Amazon Bedrock AgentCore that remembers which explanations worked for a learner, and a dashboard that shows the evidence behind every memory.</p><div class="tags"><span>Strands Agents</span><span>Bedrock AgentCore</span><span>AWS CDK</span></div></div>
+      <div class="res">Two upstream fixes to the Strands SDK; AWS Builder Center article</div>
+    </li>
+    <li>
+      <div class="when">Aug to Sep 2026</div>
+      <div><h3><a href="./projects/biohub-cell-tracking.html">Tracking dividing cells in zebrafish embryos</a></h3><p>Kaggle competition on 3D-plus-time microscopy. Oracle experiments showed linking was not the bottleneck, which redirected the work to detection and divisions.</p><div class="tags"><span>PyTorch</span><span>ILP</span><span>Kaggle</span></div></div>
+      <div class="res">Public leaderboard <b>0.608</b> to <b>0.946</b></div>
+    </li>
+  </ul>
+</div></section>
+
+<section class="sec" id="more"><div class="wrap grid2">
+  <div>
+    <h2>Also competing</h2>
+    <ul class="compact">
+      <li><b>ARC Prize 2026, ARC-AGI-3</b><span>Running and ablating a public agent harness for unseen interactive games on an open model. So far the clearest finding is that scores on the 25 public games overstate the leaderboard by about three times.</span></li>
+      <li><b>ARC Prize 2026, ARC-AGI-2</b><span>Measured whether open teacher models could write solver programs to use as training data. The best one solved 2 of 35 evaluation tasks, so I paused the line.</span></li>
+      <li><b>RSNA Knee Abnormality Detection</b><span>Twelve-label knee MRI classification on Kaggle TPUs, with only 58 gold-labelled studies.</span></li>
+      <li><b>OpenCV AI Competition 2026</b><span>Estimating how orbital debris tumbles from monocular video, with a system that declines to answer when the geometry does not allow it.</span></li>
+    </ul>
+  </div>
+  <div>
+    <h2>Open source</h2>
+    <ul class="compact">
+      <li><b><a href="https://github.com/google/adk-python/issues/6836">google/adk-python #6836</a></b><span>Reported that <code>LlmAgent</code> rejected <code>temperature=</code>, with a reproduction. Fixed upstream.</span></li>
+      <li><b><a href="https://github.com/googleapis/python-genai/issues/2889">googleapis/python-genai #2889</a></b><span>Vertex structured output silently returning empty dict-typed fields.</span></li>
+      <li><b><a href="https://github.com/strands-agents/harness-sdk/pull/4207">strands-agents/harness-sdk #4207</a> and <a href="https://github.com/strands-agents/harness-sdk/pull/4208">#4208</a></b><span>Telemetry and streaming fixes, both with regression tests.</span></li>
+      <li><b><a href="https://github.com/CarSanoja/vector-db">vector-db</a></b><span>A vector database with LSH, HNSW and KD-tree indexes written from scratch, plus a write-ahead log.</span></li>
+      <li><b><a href="https://github.com/CarSanoja/the-oracle">the-oracle</a></b><span>Lets coding assistants in different projects query each other over MCP.</span></li>
+    </ul>
+  </div>
+</div></section>
+
+<section class="sec" id="earlier"><div class="wrap">
+  <h2>Earlier: robotics and perception</h2>
+  <p class="sub">2017 to 2019, mostly ROS and Gazebo. Each project ships with a written report.</p>
+  <div class="grid2">
+    <ul class="compact">
+      <li><b><a href="https://github.com/CarSanoja/RoboND-Perception-Project">3D perception for pick and place</a></b><span>Point-cloud segmentation and object recognition for a PR2 robot with PCL and MoveIt.</span></li>
+      <li><b><a href="https://github.com/CarSanoja/Home-Service-Robot">Home service robot</a></b><span>SLAM mapping, navigation goals and pick-up and drop-off on a TurtleBot.</span></li>
+      <li><b><a href="https://github.com/CarSanoja/Deep_Reinforcement_Learning_Arm_Manipulator">Reinforcement learning for an arm</a></b><span>A DQN agent that learns to reach and touch objects with a simulated manipulator.</span></li>
+    </ul>
+    <ul class="compact">
+      <li><b><a href="https://github.com/CarSanoja/SLAM_project">RTAB-Map SLAM</a> and <a href="https://github.com/CarSanoja/Localization_Project">AMCL localization</a></b><span>Mapping and particle-filter localization for mobile robots.</span></li>
+      <li><b><a href="https://github.com/CarSanoja/RoboND-DeepLearning-Project">Follow-me drone</a></b><span>A fully convolutional network that segments and follows a person in simulation.</span></li>
+      <li><b><a href="https://github.com/CarSanoja/ACLAHE">ACLAHE</a></b><span>A paper implementation of entropy-based adaptive contrast enhancement.</span></li>
+    </ul>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap"><span>Carlos Sanoja, Spain</span><span class="foot-links"><a href="https://github.com/CarSanoja">GitHub</a><a href="https://www.kaggle.com/charlieesv">Kaggle</a><a href="https://orcid.org/0009-0000-0339-7072">ORCID</a></span></div></footer>
+<script src="./assets/site.js"></script>
+</body>
+</html>
